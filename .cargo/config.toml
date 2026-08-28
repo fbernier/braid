@@ -1,0 +1,6 @@
+[env]
+# `libghostty-vt-sys`'s build.rs picks its Zig OptimizeMode from Cargo's `DEBUG`,
+# which is set for `debug = 1` too — so asking for symbols silently drops the VT
+# core to a Debug Zig build ~6000x slower (5719 ms vs 0.91 ms per 256 KiB).
+# Checked before `DEBUG`; not `force`, so an explicit override still wins.
+LIBGHOSTTY_VT_SYS_OPTIMIZE = "ReleaseFast"

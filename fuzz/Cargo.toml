@@ -1,0 +1,99 @@
+[package]
+name = "braid-proto-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+# Its own workspace root: nightly plus a sanitizer, and nothing in `crates/` may depend on it.
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+braid-dgram = { path = "../crates/dgram" }
+braid-sim = { path = "../crates/sim" }
+braid-proto = { path = "../crates/proto" }
+braid-server = { path = "../crates/server", features = ["fuzzing"] }
+braid-vt = { path = "../crates/vt" }
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "client_message_decode"
+path = "fuzz_targets/client_message_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "server_message_decode"
+path = "fuzz_targets/server_message_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "frame_reader"
+path = "fuzz_targets/frame_reader.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "screen_parts"
+path = "fuzz_targets/screen_parts.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "frame_reader_reuse"
+path = "fuzz_targets/frame_reader_reuse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "dgram_schedule"
+path = "fuzz_targets/dgram_schedule.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "dgram_recv"
+path = "fuzz_targets/dgram_recv.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wire_unpack"
+path = "fuzz_targets/wire_unpack.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "vt_feed"
+path = "fuzz_targets/vt_feed.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "deferred_osc"
+path = "fuzz_targets/deferred_osc.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "query_filter"
+path = "fuzz_targets/query_filter.rs"
+test = false
+doc = false
+bench = false

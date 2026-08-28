@@ -1,0 +1,45 @@
+name: Bug report
+description: Something went wrong in a session, a reconnect, or a build.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Braid is alpha and the wire protocol still breaks between versions. A stale `brd`
+        earlier on the remote PATH fails as `stream ended before a complete frame`, with
+        the version named nowhere — which is why both versions below are asked for first.
+
+  - type: input
+    id: versions
+    attributes:
+      label: brd --version, on both ends
+      description: Locally, and `ssh <host> brd --version` for the version an ssh login actually resolves.
+      placeholder: "local: brd 0.1.0 / remote: brd 0.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: platforms
+    attributes:
+      label: Client and host OS
+      placeholder: "client: macOS 15.4 / host: Debian 13"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, what you got. A transcript beats a description.
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: BRD_LOG output
+      description: >
+        Re-run with `BRD_LOG=/tmp/brd.log` and paste it. It carries a line per reconnect,
+        transport change and detach — the state a terminal cannot show and a description
+        cannot reconstruct.
+      render: text

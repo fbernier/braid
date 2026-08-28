@@ -1,0 +1,5 @@
+/target
+__pycache__/
+
+# Local design notes, deliberately outside the published tree.
+/HANDOFF.md

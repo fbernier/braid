@@ -1,0 +1,47 @@
+[graph]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+
+[licenses]
+version = 2
+# `Unicode-3.0` is here for `unicode-ident`, which every proc-macro in the tree
+# pulls in: the Unicode data tables carry their own permissive terms alongside
+# the crate's MIT/Apache dual licence.
+allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "Zlib", "ISC", "Unicode-3.0"]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Every workspace member is an unpublished path dependency, which carries no
+# version by construction. The ban is here for a registry dependency pinned to
+# `*`, which is the one that can change under a build.
+allow-wildcard-paths = true
+
+# The workspace deleted `ring`, `rustls` and `aws-lc-sys` deliberately: a
+# terminal multiplexer does not need a TLS stack, and every one of them carries
+# a C toolchain dependency and a build script. Naming them here is what stops a
+# transitive dependency from bringing one back unnoticed.
+deny = [
+    { name = "ring" },
+    { name = "rustls" },
+    { name = "aws-lc-sys" },
+    { name = "openssl-sys" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+
+# The only non-crates.io dependency in the tree, and the only unreviewed unsafe
+# surface: `crates/vt` is `#![forbid(unsafe_code)]`, which buys nothing across
+# the FFI boundary this crate owns. Allowing it by URL means relocating or
+# unpinning it is a build failure rather than a silent swap.
+#
+# The Ghostty tree it compiles is not visible here at all — no manifest names
+# it, `Cargo.lock` does not record it, and this policy cannot reach it. That
+# tree is chosen by `libghostty-vt-sys`'s own pinned `GHOSTTY_COMMIT`, which is
+# what the `rev` above transitively pins; a build fetches it over the network.
+allow-git = ["https://github.com/Uzaaft/libghostty-rs"]

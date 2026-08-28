@@ -1,0 +1,212 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Nothing here writes to the repository, publishes, or reads a secret.
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: build, nextest, fmt (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    # Darwin is a first-class target, not an afterthought: the daemon reads
+    # `sun_path` bounds, umask, process groups and PTYs straight from the
+    # platform, and rustix gates real APIs out there — `pipe2` does not exist,
+    # so `pipe_with` is not merely slower on Darwin, it is absent. A
+    # Linux-only gate cannot see that class at all.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        with:
+          toolchain: stable
+          components: rustfmt
+
+      # `libghostty-vt-sys` compiles Ghostty from source, and its
+      # `build.zig.zon` names `minimum_zig_version = "0.16.0"`. Zig's check
+      # wants an exact major and minor, so this is not a floor to bump idly:
+      # `install.sh` pins the same string.
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: ${{ matrix.os }}
+
+      # First, because it needs none of the build above and a run that is going
+      # to fail on whitespace should say so in twenty seconds.
+      - run: cargo fmt --all --check
+      - uses: taiki-e/install-action@fcf5432d9f50d67e37ee6e29bdb7a224ff67b4a7 # v2.86.8
+        with:
+          tool: nextest
+
+      # `--locked` throughout: without it Cargo may resolve a lockfile the
+      # `deny` job never audited, and the gate would be reporting on a
+      # dependency graph no other job saw.
+      - run: cargo build --workspace --locked
+      - run: cargo nextest run --workspace --locked
+      # Nextest does not run doctests; braid-sim has a public API example.
+      - run: cargo test --doc --workspace --locked
+
+  release:
+    name: release build and nextest (stable)
+    runs-on: ubuntu-latest
+    # The artifact users run. `install.sh` ships `cargo build --release`, and
+    # `lto = "fat"` with `codegen-units = 1` across the Ghostty FFI boundary is
+    # a materially different codegen path from the debug matrix above — one
+    # nothing else here compiles, let alone executes. Linux only: what this
+    # gates is the codegen, and the platform-API surface is covered above.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        with:
+          toolchain: stable
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: release-linux
+
+      - uses: taiki-e/install-action@fcf5432d9f50d67e37ee6e29bdb7a224ff67b4a7 # v2.86.8
+        with:
+          tool: nextest
+
+      - run: cargo build --release --workspace --locked
+      # Release keeps `overflow-checks = true`, so this run gates the packet
+      # number and window arithmetic in the profile that ships, not only in the
+      # one where Cargo turns the checks on for free.
+      - run: cargo nextest run --release --workspace --locked
+
+  clippy:
+    name: clippy (stable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        with:
+          toolchain: stable
+          components: clippy
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: clippy-stable
+
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+  corpus:
+    name: fuzz corpus replay
+    runs-on: ubuntu-latest
+    # A crash the fuzzer found once has to stay fixed. `fuzz.yml` runs on a
+    # nightly cron behind a paths filter and starts from a cache that a runner
+    # may not have; the committed seeds under `fuzz/seeds` are replayed here,
+    # on every pull request, with `-runs=0` — execute each input once, mutate
+    # nothing, report a crash.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # libFuzzer needs the sanitizer runtime, which is nightly-only.
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        with:
+          toolchain: nightly
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: fuzz
+
+      - uses: taiki-e/install-action@fcf5432d9f50d67e37ee6e29bdb7a224ff67b4a7 # v2.86.8
+        with:
+          tool: cargo-fuzz
+
+      - name: replay every committed seed
+        run: |
+          for dir in fuzz/seeds/*/; do
+            target="$(basename "$dir")"
+            echo "===== $target ($(find "$dir" -type f | wc -l) inputs) ====="
+            cargo fuzz run "$target" --target x86_64-unknown-linux-gnu "$dir" -- -runs=0
+          done
+
+  e2e:
+    name: e2e (loopback sshd)
+    runs-on: ubuntu-latest
+    # The only coverage of detach/reattach, two clients on one PTY, SIGHUP
+    # survival, two daemons racing for the socket, and ssh-to-datagram
+    # migration — every failure mode that strands a user's shells. The runner
+    # holds each suite to 180 s and prints a PASS/FAIL summary.
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        with:
+          toolchain: stable
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: release-linux
+
+      - name: stand up a loopback sshd
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes openssh-server
+          sudo systemctl enable --now ssh
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keygen -t ed25519 -N '' -f ~/.ssh/id_ed25519
+          cat ~/.ssh/id_ed25519.pub >> ~/.ssh/authorized_keys
+          chmod 600 ~/.ssh/authorized_keys
+          ssh-keyscan -H 127.0.0.1 >> ~/.ssh/known_hosts
+          ssh -o BatchMode=yes "$USER@127.0.0.1" true
+
+      # Through the installer, so the script users run is gated by the same job
+      # that gates what it installs. It has to be a real install on PATH: an
+      # `ssh` login resolves `brd --server` through its own PATH, not through
+      # anything this step exports.
+      - name: install brd
+        run: |
+          ./install.sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - run: BRD_E2E=1 python3 tests/e2e/run.py
+
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # `crates/vt` pins `libghostty-vt` to a git revision, which is the
+      # largest unreviewed surface in the workspace and the one every other
+      # gate here is blind to. The `sources` check is what makes an unpinned or
+      # relocated dependency a build failure rather than a silent swap.
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+        with:
+          command: check advisories bans licenses sources

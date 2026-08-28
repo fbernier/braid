@@ -1,0 +1,61 @@
+[workspace]
+members = ["crates/dgram", "crates/sim", "crates/proto", "crates/forward", "crates/client", "crates/server", "crates/vt"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/fbernier/braid"
+
+[workspace.dependencies]
+portable-pty = "0.9.0"
+rustix = { version = "1.1.4", features = ["termios", "process", "stdio", "fs", "event", "net"] }
+thiserror = "2.0.20"
+blake3 = "1.8.7"
+# RFC 8439 AEAD, pure Rust, no build script. Replaces a hand-rolled BLAKE3
+# construction: recognisable on sight beats one fewer dependency.
+chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["zeroize"] }
+getrandom = "0.4.3"
+signal-hook = "0.4.4"
+# Pure Rust deflate: no C, no build script, no toolchain dependency.
+miniz_oxide = "0.9.1"
+# Real width table; the allowlist it replaced cost a round trip per non-Latin keystroke.
+unicode-width = "0.2"
+
+[workspace.lints.rust]
+unreachable_pub = "warn"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+# 48-bit packet numbers and window arithmetic; Cargo disables these for release
+# builds, so a silent wrap is unreachable by the suite. Costs +1.8% on 400k frames.
+overflow-checks = true
+# Not `panic = "abort"`: one session's panic must not take the daemon down.
+
+[package]
+name = "braid"
+version = "0.1.0"
+description = "A remote shell that outlives its connection"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+publish = false
+
+[[bin]]
+name = "brd"
+path = "src/main.rs"
+
+[dependencies]
+braid-client = { path = "crates/client" }
+braid-server = { path = "crates/server" }
+
+[lints]
+workspace = true

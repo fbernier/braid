@@ -1,0 +1,21 @@
+[package]
+name = "braid-sim"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+# A test harness, not a component: nothing `brd` ships depends on this.
+[dependencies]
+braid-dgram = { path = "../dgram" }
+# The harness packs datagram bodies like a real endpoint's caller, so the link
+# sees the size distribution a session actually puts on it.
+braid-proto = { path = "../proto" }
+
+[lints]
+workspace = true
+
+# The convergence oracle drives the real ledger; development only.
+[dev-dependencies]
+braid-server = { path = "../server" }
+braid-vt = { path = "../vt" }

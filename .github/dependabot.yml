@@ -1,0 +1,25 @@
+version: 2
+
+# CI pins every action to a commit SHA, which is the only pin a tag cannot be
+# moved out from under. That trade needs a bot to keep the SHAs current, or the
+# pins rot into unpatched actions.
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: monthly
+    # `Cargo.lock` is committed and every CI job runs `--locked`, so a lockfile
+    # bump has to arrive as a reviewed pull request like any other change.
+    versioning-strategy: lockfile-only
+
+  # A separate workspace with its own lockfile; the root update never sees it.
+  - package-ecosystem: cargo
+    directory: /fuzz
+    schedule:
+      interval: monthly
+    versioning-strategy: lockfile-only

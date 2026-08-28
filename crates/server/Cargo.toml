@@ -1,0 +1,29 @@
+[package]
+name = "braid-server"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+braid-dgram = { path = "../dgram" }
+braid-forward = { path = "../forward" }
+braid-proto = { path = "../proto" }
+braid-vt = { path = "../vt" }
+# `pipe`: the two PTY threads park on a pipe whose write end closing retires them.
+rustix = { workspace = true, features = ["pipe"] }
+portable-pty.workspace = true
+blake3.workspace = true
+getrandom.workspace = true
+thiserror.workspace = true
+
+# `getpeereid(3)` is `SO_PEERCRED` on the BSDs; rustix exposes neither.
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+libc = "0.2"
+
+# `braid-fuzz` drives the deferred-OSC scanner directly; `pub(crate)` without it.
+[features]
+fuzzing = []
+
+[lints]
+workspace = true

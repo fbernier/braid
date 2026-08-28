@@ -1,0 +1,7 @@
+target
+# The fuzzer's working set, restored from a CI cache and rewritten every run.
+# What is committed is `seeds/`: the minimised floor a cache miss starts from,
+# and the inputs `ci.yml` replays with `-runs=0` so a past crash stays fixed.
+corpus
+artifacts
+coverage
